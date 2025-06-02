@@ -33,6 +33,10 @@ SoftwareSerial softSerial(/*rx =*/4, /*tx =*/5);
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
 
+int curSong = 1;
+int busyLine = 13;
+int busyState = 0;
+
 void setup()
 {
 #if (defined ESP32)
@@ -56,23 +60,62 @@ void setup()
     }
   }
   Serial.println(F("DFPlayer Mini online."));
-  
+  myDFPlayer.outputDevice(DFPLAYER_DEVICE_SD);
+  delay(300);
+  myDFPlayer.enableDAC();
   myDFPlayer.volume(10);  //Set volume value. From 0 to 30
-  myDFPlayer.play(1);  //Play the first mp3
+  curSong = 4;
+  myDFPlayer.playMp3Folder(curSong);  //Play the first mp3
+  delay(500);
 }
+
+unsigned long timer = 100;
+bool ready = false;
+bool check = true;
+int lastVal = 0;
+int i = 0;
 
 void loop()
 {
-  static unsigned long timer = millis();
+  lastVal = busyState;
+  busyState = digitalRead(busyLine);
   
-  if (millis() - timer > 30000) {
+  if (busyState != lastVal){
+    Serial.print("BusyLine: ");
+    Serial.println(busyState);
+  }
+  
+
+  // if ((myDFPlayer.readType() == DFPlayerPlayFinished) && (check == true)){
+  //   delay(500);
+  //   ready = true;
+  //   check = false;
+  // }
+  i++;
+  // Serial.print("i: ");
+  // Serial.print(i);
+  // Serial.print(", BusyState: ");
+  // Serial.println(busyState);
+  if ((busyState >= 1) && (i >= 40)) {
+    delay(500);
+    i = 0;
+    ready = false;
+    check = true;
+    Serial.print("Finished Playing ");
+    Serial.print(curSong);
+    Serial.print(", Now Playing: ");
+    curSong++;
+    Serial.println(curSong);
+    //delay(100);
     timer = millis();
-    myDFPlayer.next();  //Play next mp3 every 3 second.
+    myDFPlayer.playMp3Folder(curSong);  //Play next mp3 every 3 second.
+    delay(500);
   }
   
   if (myDFPlayer.available()) {
     printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
   }
+  delay(500);
 }
 
 void printDetail(uint8_t type, int value){
