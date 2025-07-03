@@ -24,7 +24,7 @@ DFPlayer - A Mini MP3 Player For Arduino
 
 #if (defined(ARDUINO_AVR_UNO) || defined(ESP8266))   // Using a soft serial port
 #include <SoftwareSerial.h>
-SoftwareSerial softSerial(/*rx =*/4, /*tx =*/5);
+SoftwareSerial softSerial(/*rx =*/4, /*tx =*/2);
 #define FPSerial softSerial
 #else
 #define FPSerial Serial1
@@ -40,7 +40,7 @@ int busyState = 0;
 void setup()
 {
 #if (defined ESP32)
-  FPSerial.begin(9600, SERIAL_8N1, /*rx =*/4, /*tx =*/5);
+  FPSerial.begin(9600, SERIAL_8N1, /*rx =*/4, /*tx =*/2);
 #else
   FPSerial.begin(9600);
 #endif
@@ -64,7 +64,7 @@ void setup()
   delay(300);
   myDFPlayer.enableDAC();
   myDFPlayer.volume(10);  //Set volume value. From 0 to 30
-  curSong = 4;
+  curSong = 9600;
   myDFPlayer.playMp3Folder(curSong);  //Play the first mp3
   delay(500);
 }
