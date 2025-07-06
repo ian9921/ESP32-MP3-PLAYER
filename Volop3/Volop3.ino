@@ -114,6 +114,7 @@ int lastVal = 0;
 int i = 0;
 unsigned char dummy;
 char readVals[200];
+char title[200];
 
 void loop()
 {
@@ -135,8 +136,10 @@ void loop()
   
   i++;
   
-  findNumber(readVals, 200, 3679, 20000);
+  findNumber(readVals, 200, 679, 20000);
   Serial.println(readVals);
+  extractTitle(title, 200, NUM_SIZE, readVals, 200);
+  Serial.println(title);
 
   if ((busyState >= 1) && (i >= 40)) {
     delay(500);
@@ -168,8 +171,6 @@ void findNumber(char *buff, int size, int target, int max){
   int j = 0;
 
   myFile = SD.open("/demofile.txt");
-
-
 
   if (myFile.available()){
 
@@ -211,6 +212,56 @@ void findNumber(char *buff, int size, int target, int max){
     Serial.println("We are not available");
   }
 
+}
+
+//takes a c string, inputted as input, and extracts the title from it. numSize is the size of the number section of the cstring and input is the string to be parsed. 
+void extractTitle (char *buff, int buffSize, int numSize, char *input, int inSize){
+  int lowSize = buffSize;
+  char temp[5];
+
+  //myFile = SD.open("/demofile.txt");
+
+  temp[0] = '\0';
+  temp[1] = '\0';
+  temp[2] = '\0';
+  temp[3] = '\0';
+  temp[4] = '\0';
+
+  if (inSize < buffSize){
+    lowSize = inSize;
+  }
+  for (int j  = 0; j < buffSize; j++){
+    buff[j] = '\0';
+  }
+  for (int i = (numSize + 4); i < lowSize; i++){
+    Serial.print("Math Result: ");
+    Serial.println(((i - (numSize+3)) - 4));
+    if (((i - (numSize+4)) - 4) >= 0){
+      buff[((i - (numSize+4)) - 4)] = temp[0];
+    }
+    temp[0] = temp[1];
+    temp[1] = temp[2];
+    temp[2] = temp[3];
+    temp[3] = input[i];
+
+    Serial.print("Temp: ");
+    Serial.println(temp);
+    Serial.print("Buff: ");
+    Serial.println(buff);
+
+
+    Serial.print("String Comp: ");
+    Serial.println(strcmp(temp, " -- \0"));
+    if (strcmp(temp, " -- \0") == 0){
+      Serial.print(buff);
+      Serial.println("<");
+      //myFile.close();
+      return;
+    }
+    //buff[i - (numSize+3)] = input[i];
+  }
+  //myFile.close();
+  return;
 }
 
 void printDetail(uint8_t type, int value){
