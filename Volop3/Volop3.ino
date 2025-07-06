@@ -20,27 +20,36 @@ DFPlayer - A Mini MP3 Player For Arduino
  ****************************************************/
 
 #include "Arduino.h"
+#include "string.h"
 #include "DFRobotDFPlayerMini.h"
+
+#include "FS.h"
+#include "SD.h"
+#include "SPI.h"
 
 #if (defined(ARDUINO_AVR_UNO) || defined(ESP8266))   // Using a soft serial port
 #include <SoftwareSerial.h>
-SoftwareSerial softSerial(/*rx =*/4, /*tx =*/2);
+SoftwareSerial softSerial(/*rx =*/4, /*tx =*/14);
 #define FPSerial softSerial
 #else
 #define FPSerial Serial1
 #endif
 
 DFRobotDFPlayerMini myDFPlayer;
+File myFile;
 void printDetail(uint8_t type, int value);
 
 int curSong = 1;
 int busyLine = 13;
 int busyState = 0;
+int max_file;
+
+const int NUM_SIZE = 4;
 
 void setup()
 {
 #if (defined ESP32)
-  FPSerial.begin(9600, SERIAL_8N1, /*rx =*/4, /*tx =*/2);
+  FPSerial.begin(9600, SERIAL_8N1, /*rx =*/4, /*tx =*/14);
 #else
   FPSerial.begin(9600);
 #endif
@@ -51,6 +60,34 @@ void setup()
   Serial.println(F("DFRobot DFPlayer Mini Demo"));
   Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
   
+  if(!SD.begin(5)){
+      Serial.println("Card Mount Failed");
+      return;
+  }
+
+  uint8_t cardType = SD.cardType();
+
+  if(cardType == CARD_NONE){
+      Serial.println("No SD card attached");
+      return;
+  }
+
+  Serial.print("SD Card Type: ");
+  if(cardType == CARD_MMC){
+      Serial.println("MMC");
+  } else if(cardType == CARD_SD){
+      Serial.println("SDSC");
+  } else if(cardType == CARD_SDHC){
+      Serial.println("SDHC");
+  } else {
+      Serial.println("UNKNOWN");
+  }
+
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  Serial.printf("SD Card Size: %lluMB\n", cardSize);
+
+  
+
   if (!myDFPlayer.begin(FPSerial, /*isACK = */true, /*doReset = */true)) {  //Use serial to communicate with mp3.
     Serial.println(F("Unable to begin:"));
     Serial.println(F("1.Please recheck the connection!"));
@@ -64,9 +101,10 @@ void setup()
   delay(300);
   myDFPlayer.enableDAC();
   myDFPlayer.volume(10);  //Set volume value. From 0 to 30
-  curSong = 9600;
+  curSong = 1;
   myDFPlayer.playMp3Folder(curSong);  //Play the first mp3
   delay(500);
+
 }
 
 unsigned long timer = 100;
@@ -74,9 +112,15 @@ bool ready = false;
 bool check = true;
 int lastVal = 0;
 int i = 0;
+unsigned char dummy;
+char readVals[200];
 
 void loop()
 {
+
+  int j = 0;
+  
+  String testy;
   lastVal = busyState;
   busyState = digitalRead(busyLine);
   
@@ -84,28 +128,26 @@ void loop()
     Serial.print("BusyLine: ");
     Serial.println(busyState);
   }
-  
 
-  // if ((myDFPlayer.readType() == DFPlayerPlayFinished) && (check == true)){
-  //   delay(500);
-  //   ready = true;
-  //   check = false;
-  // }
+  for (int k = 0; k < 200; k++){
+    readVals[k] = '\0';
+  }
+  
   i++;
-  // Serial.print("i: ");
-  // Serial.print(i);
-  // Serial.print(", BusyState: ");
-  // Serial.println(busyState);
+  
+  findNumber(readVals, 200, 3679, 20000);
+  Serial.println(readVals);
+
   if ((busyState >= 1) && (i >= 40)) {
     delay(500);
     i = 0;
     ready = false;
     check = true;
-    Serial.print("Finished Playing ");
-    Serial.print(curSong);
-    Serial.print(", Now Playing: ");
+    // Serial.print("Finished Playing ");
+    // Serial.print(curSong);
+    // Serial.print(", Now Playing: ");
     curSong++;
-    Serial.println(curSong);
+    // Serial.println(curSong);
     //delay(100);
     timer = millis();
     myDFPlayer.playMp3Folder(curSong);  //Play next mp3 every 3 second.
@@ -116,6 +158,59 @@ void loop()
     printDetail(myDFPlayer.readType(), myDFPlayer.read()); //Print the detail message from DFPlayer to handle different errors and states.
   }
   delay(500);
+}
+
+//takes a given number and returns the corresponding complete song string in the buffer
+void findNumber(char *buff, int size, int target, int max){
+  char tempRead[size];
+  char lineNumStr[NUM_SIZE];
+  int lineNum;
+  int j = 0;
+
+  myFile = SD.open("/demofile.txt");
+
+
+
+  if (myFile.available()){
+
+    for (int o = 0; o < max; o++){
+
+      for (int p = 0; p < size; p++){
+        tempRead[p] = '\0';
+      }
+      dummy = myFile.read();
+      j = 0;
+      while (dummy != '\n'){
+        tempRead[j] = (char)dummy;
+        dummy = myFile.read();
+        j++;
+      }
+
+      for (int m = 0; m < NUM_SIZE; m++){
+        lineNumStr[m] = tempRead[m];
+      }
+
+      lineNum = atoi(lineNumStr);
+      //Serial.println(lineNum);
+
+      if (lineNum == target){
+        for (int n = 0; n < size; n++){
+          buff[n] = tempRead[n];
+        }
+        myFile.close();
+        Serial.println("Number Found!");
+        return;
+      }
+    }
+    myFile.close();
+    Serial.println("Number does not exist, register unchanged.");
+    return;
+    //Serial.println(readVals);
+    
+  } else {
+    Serial.println("We are not available");
+  }
+
 }
 
 void printDetail(uint8_t type, int value){
