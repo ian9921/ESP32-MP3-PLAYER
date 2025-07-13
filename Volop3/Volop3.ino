@@ -40,11 +40,19 @@ File myFile;
 void printDetail(uint8_t type, int value);
 
 int curSong = 1;
+int curFold = 1;
 int busyLine = 13;
 int busyState = 0;
 int max_file;
 
-const int NUM_SIZE = 4;
+const int NUM_SIZE = 3;
+const int FOL_SIZE = 2;
+const int NUMS_START = FOL_SIZE + 4;
+
+struct coords {
+  int fold;
+  int main;
+};
 
 void setup()
 {
@@ -102,7 +110,8 @@ void setup()
   myDFPlayer.enableDAC();
   myDFPlayer.volume(10);  //Set volume value. From 0 to 30
   curSong = 1;
-  myDFPlayer.playMp3Folder(curSong);  //Play the first mp3
+  curFold = 1;
+  myDFPlayer.playFolder(curFold, curSong);  //Play the first mp3
   delay(500);
 
 }
@@ -120,6 +129,8 @@ void loop()
 {
 
   int j = 0;
+  struct coords test;
+  int titleTest = 0;
   
   String testy;
   lastVal = busyState;
@@ -136,24 +147,55 @@ void loop()
   
   i++;
   
-  findNumber(readVals, 200, 679, 20000);
+  findNumber(readVals, 200, 237, 4, 20000);
+  Serial.print("Find Numer Result: ");
   Serial.println(readVals);
-  extractTitle(title, 200, NUM_SIZE, readVals, 200);
+  extractTitle(title, 200, readVals, 200);
+  Serial.print("Extract Ttile Result: ");
   Serial.println(title);
+  test = extractNums(readVals, 200);
+  Serial.print("Folder Coord: ");
+  Serial.print(test.fold);
+  Serial.print(" Main Coord: ");
+  Serial.println(test.main);
+  //delay(3000);
+  titleTest = checkTitle("Bottom of the Sea", 4, 237);
+  Serial.print("Full Match Test (should say 1): ");
+  Serial.println(titleTest);
+  titleTest = checkTitle("Bottom", 4, 237);
+  Serial.print("Partial Match Test (should say 2): ");
+  Serial.println(titleTest);
+  titleTest = checkTitle("Wellerman", 4, 237);
+  Serial.print("No Match Test (should say 0): ");
+  Serial.println(titleTest);
+
+  titleTest = checkTitle("The American Dream Is Killing Me", 2, 40);
+  Serial.print("Full Match Test With The (should say 1): ");
+  Serial.println(titleTest);
+  titleTest = checkTitle("American Dream Is Killing Me", 2, 40);
+  Serial.print("Full Match Test Dropping The (should say 1): ");
+  Serial.println(titleTest);
+  titleTest = checkTitle("American Dream", 2, 40);
+  Serial.print("Partial Match Test Dropping The (should say 2): ");
+  Serial.println(titleTest); 
 
   if ((busyState >= 1) && (i >= 40)) {
     delay(500);
     i = 0;
     ready = false;
     check = true;
-    // Serial.print("Finished Playing ");
-    // Serial.print(curSong);
-    // Serial.print(", Now Playing: ");
+    Serial.print("Finished Playing ");
+    Serial.print(curSong);
+    Serial.print(", Now Playing: ");
     curSong++;
+    if (curSong > 255){
+      curSong = 1;
+      curFold++;
+    }
     // Serial.println(curSong);
     //delay(100);
     timer = millis();
-    myDFPlayer.playMp3Folder(curSong);  //Play next mp3 every 3 second.
+    myDFPlayer.playFolder(curFold, curSong);  //Play next mp3 every 3 second.
     delay(500);
   }
   
@@ -163,14 +205,106 @@ void loop()
   delay(500);
 }
 
-//takes a given number and returns the corresponding complete song string in the buffer
-void findNumber(char *buff, int size, int target, int max){
+//takes a folder number and main number and returns whether or not the title matches. 0 means no match, 1 means target matches first words, 2 means target appears anywhere in the title.
+int checkTitle(char *target, int foldNum, int mainNum){
+  char buffer[200];
+  char title[200];
+  char regTitle[200];
+  char regInput[200];
+  int c = 0;
+  int d = 0;
+
+  int perfect;
+  bool imperfect;
+
+  bool inputCap = false;
+
+  struct coords spots;
+
+  bool searchThe = 0;
+
+  findNumber(buffer, 200, mainNum, foldNum, 20000);
+  extractTitle(title, 200, buffer, 200);
+  // Serial.println(target);
+  for (int j = 0; j < 200; j++){
+    regTitle[j] = '\0';
+    regInput[j] = '\0';
+  }
+
+  for (int i = 0; i < 200; i++){
+    //Serial.println("We Are In The For lOop");
+    if (isalnum(title[i])){
+      regTitle[c] = title[i];
+      //Serial.print(regTitle[d]);
+      regTitle[c] = tolower(regTitle[c]);
+      c++;
+    }
+    if (target[i] == '\0'){
+      inputCap = true;
+    }
+    if (inputCap == false)
+    {
+      if (isalnum(target[i])){
+        regInput[d] = target[i];
+        //Serial.println(regInput[d]);
+        delay(10);
+        regInput[d] = tolower(regInput[d]);
+        d++;
+      } 
+    }
+  }
+  // Serial.print("RegInput: ");
+  // Serial.println(regInput);
+  regTitle[c] = '\0';
+  regInput[d] = '\0';
+  c = 0;
+  // Serial.print("RegInput: ");
+  // Serial.println(regInput);
+  
+  if ((regInput[0] == 't') && (regInput[1] == 'h') && (regInput[2] == 'e')){
+    searchThe = 1;
+  } else {
+    searchThe = 0;
+  }
+
+  if (searchThe == 0){ //eliminates The from the title
+    if ((regTitle[0] == 't') && (regTitle[1] == 'h') && (regTitle[2] == 'e')){
+      c = 3;
+      while(regTitle[c] != '\0'){
+        regTitle[c-3] = regTitle[c];
+        //Serial.println("We are in the while loop");
+        c++;
+      }
+      regTitle[c-3] = '\0';
+    }
+  }
+
+  perfect = strcmp(regTitle, regInput);
+  // Serial.print("RegTitle: ");
+  // Serial.println(regTitle);
+  // Serial.print("RegInput: ");
+  // Serial.println(regInput);
+  if (perfect == 0){
+    return 1;
+  } else if (strstr(regTitle, regInput) != NULL){
+    return 2;
+  } else {
+    return 0;
+  }
+}
+
+//takes a given number & folder number and returns the corresponding complete song string in the buffer
+void findNumber(char *buff, int size, int target, int folder, int max){
   char tempRead[size];
   char lineNumStr[NUM_SIZE];
+  char folNumStr[FOL_SIZE];
   int lineNum;
+  int folNum;
   int j = 0;
 
   myFile = SD.open("/demofile.txt");
+
+  Serial.println("Find Number is Running");
 
   if (myFile.available()){
 
@@ -184,19 +318,58 @@ void findNumber(char *buff, int size, int target, int max){
       while (dummy != '\n'){
         tempRead[j] = (char)dummy;
         dummy = myFile.read();
+
+        //Serial.println("In Dummy Clear Loop");
         j++;
       }
+      // Serial.println(tempRead);
 
-      for (int m = 0; m < NUM_SIZE; m++){
-        lineNumStr[m] = tempRead[m];
+      for (int q = 0; q < FOL_SIZE; q++){
+        folNumStr[q] = tempRead[q];
+        // Serial.print("Fol Num Str[q]: ");
+        // Serial.println(folNumStr[q]);
+        //Serial.println("In Find Fol Num Loop");
       }
+      // Serial.print("folder String: ");
+      // Serial.println(folNumStr);
+
+      // for (int m = 0; m < NUM_SIZE; m++){
+      //   lineNumStr[m] = tempRead[m];
+      // }
+      for (int m = (NUMS_START); m < (NUMS_START + NUM_SIZE); m++){
+        // Serial.print("M: ");
+        // Serial.print(m);
+        // Serial.print(" NUMS_START: ");
+        // Serial.print(NUMS_START);
+        // Serial.print(" Start+Size: ");
+        // Serial.println((NUMS_START + NUM_SIZE));
+        // Serial.println(tempRead[m]);
+        lineNumStr[m-NUMS_START] = tempRead[m];
+        // Serial.print("Line Num Str[m]: ");
+        // Serial.println(lineNumStr[m-NUMS_START]);
+        //Serial.println("In Find main Num Loop");
+      }
+      // Serial.print("num string: ");
+      // Serial.println(lineNumStr);
 
       lineNum = atoi(lineNumStr);
+      folNum = atoi(folNumStr);
       //Serial.println(lineNum);
 
-      if (lineNum == target){
+      // Serial.print("Number: ");
+      // Serial.print(lineNum);
+      // Serial.print(" Target Num: ");
+      // Serial.print(target);
+      // Serial.print(" Folder: ");
+      // Serial.print(folNum);
+      // Serial.print(" Target Folder: ");
+      // Serial.println(folder);
+
+      if ((lineNum == target) && (folNum == folder)){
+        // Serial.println("Entering Buffer Loop");
         for (int n = 0; n < size; n++){
           buff[n] = tempRead[n];
+          // Serial.println("In Buff Write Num Loop");
         }
         myFile.close();
         Serial.println("Number Found!");
@@ -215,7 +388,7 @@ void findNumber(char *buff, int size, int target, int max){
 }
 
 //takes a c string, inputted as input, and extracts the title from it. numSize is the size of the number section of the cstring and input is the string to be parsed. 
-void extractTitle (char *buff, int buffSize, int numSize, char *input, int inSize){
+void extractTitle (char *buff, int buffSize, char *input, int inSize){
   int lowSize = buffSize;
   char temp[5];
 
@@ -227,34 +400,37 @@ void extractTitle (char *buff, int buffSize, int numSize, char *input, int inSiz
   temp[3] = '\0';
   temp[4] = '\0';
 
+  Serial.println("Extract Title is Running");
+
   if (inSize < buffSize){
     lowSize = inSize;
   }
   for (int j  = 0; j < buffSize; j++){
     buff[j] = '\0';
   }
-  for (int i = (numSize + 4); i < lowSize; i++){
-    Serial.print("Math Result: ");
-    Serial.println(((i - (numSize+3)) - 4));
-    if (((i - (numSize+4)) - 4) >= 0){
-      buff[((i - (numSize+4)) - 4)] = temp[0];
+  // for (int i = (numSize + 4); i < lowSize; i++){
+  for (int i = (NUMS_START + NUM_SIZE + 4); i < lowSize; i++){
+    // Serial.print("Math Result: ");
+    // Serial.println(((i - (numSize+3)) - 4));
+    if (((i - (NUM_SIZE+4)) - 4) >= 0){
+      buff[((i - (NUMS_START + NUM_SIZE + 4)) - 4)] = temp[0];
     }
     temp[0] = temp[1];
     temp[1] = temp[2];
     temp[2] = temp[3];
     temp[3] = input[i];
 
-    Serial.print("Temp: ");
-    Serial.println(temp);
-    Serial.print("Buff: ");
-    Serial.println(buff);
+    // Serial.print("Temp: ");
+    // Serial.println(temp);
+    // Serial.print("Buff: ");
+    // Serial.println(buff);
 
 
-    Serial.print("String Comp: ");
-    Serial.println(strcmp(temp, " -- \0"));
+    // Serial.print("String Comp: ");
+    // Serial.println(strcmp(temp, " -- \0"));
     if (strcmp(temp, " -- \0") == 0){
-      Serial.print(buff);
-      Serial.println("<");
+      // Serial.print(buff);
+      // Serial.println("<");
       //myFile.close();
       return;
     }
@@ -262,6 +438,27 @@ void extractTitle (char *buff, int buffSize, int numSize, char *input, int inSiz
   }
   //myFile.close();
   return;
+}
+
+//takes c string as input and extracts coordinate numbers.
+struct coords extractNums(char *input, int inSize){
+  struct coords res;
+  char foldNumS[FOL_SIZE+1];
+  char mainNumS[NUM_SIZE+1];
+
+  for (int i = 0; i < FOL_SIZE; i++){
+    foldNumS[i] = input[i];
+  }
+  foldNumS[FOL_SIZE] = '\0';
+  res.fold = atoi(foldNumS);
+  
+  for (int m = (NUMS_START); m < (NUMS_START + NUM_SIZE); m++){
+    mainNumS[m-NUMS_START] = input[m];
+  }
+  mainNumS[NUM_SIZE] = '\0';
+  res.main = atoi(mainNumS);
+
+  return res;
 }
 
 void printDetail(uint8_t type, int value){
