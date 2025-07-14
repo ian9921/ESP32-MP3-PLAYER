@@ -169,6 +169,18 @@ void loop()
   Serial.print("No Match Test (should say 0): ");
   Serial.println(titleTest);
 
+  titleTest = checkTitle("The American Dream Is Killing Me", 200, 500);
+  Serial.print("Folder and number do not exist (should say -1): ");
+  Serial.println(titleTest);
+
+  titleTest = checkTitle("The American Dream Is Killing Me", 2, 500);
+  Serial.print("Number does not exist (should say -1): ");
+  Serial.println(titleTest);
+
+  titleTest = checkTitle("The American Dream Is Killing Me", 200, 40);
+  Serial.print("Folder does not exist (should say -1): ");
+  Serial.println(titleTest);
+
   titleTest = checkTitle("The American Dream Is Killing Me", 2, 40);
   Serial.print("Full Match Test With The (should say 1): ");
   Serial.println(titleTest);
@@ -205,7 +217,23 @@ void loop()
   delay(500);
 }
 
-//takes a folder number and main number and returns whether or not the title matches. 0 means no match, 1 means target matches first words, 2 means target appears anywhere in the title.
+//takes an array and writes to it a list of values to be played next. List size is the size of the array passed. Start variables default to zero but may be raised to skip certain sections
+void nameSearch(struct coords *playList, int listSize, int startFold = 0, int startMain = 0, int maxFold = 100, int maxMain = 255){
+  struct coords fullMatch[listSize];
+  struct coords partMatch[listSize];
+
+  //fill both arrays with impossible values to mark empty spots
+  for (int i = 0; i < listSize; i++){
+    fullMatch[i].fold = 1000;
+    fullMatch[i].main = 1000;
+    partMatch[i].fold = 1000;
+    partMatch[i].main = 1000;
+  }
+
+
+}
+
+//takes a folder number and main number and returns whether or not the title matches. 0 means no match, 1 means target matches first words, 2 means target appears anywhere in the title, -1 means number does not exist
 int checkTitle(char *target, int foldNum, int mainNum){
   char buffer[200];
   char title[200];
@@ -223,7 +251,12 @@ int checkTitle(char *target, int foldNum, int mainNum){
 
   bool searchThe = 0;
 
+  buffer[0] = '\0';
+
   findNumber(buffer, 200, mainNum, foldNum, 20000);
+  if (buffer[0] == '\0'){
+    return -1;
+  }
   extractTitle(title, 200, buffer, 200);
   // Serial.println(target);
   for (int j = 0; j < 200; j++){
@@ -315,55 +348,38 @@ void findNumber(char *buff, int size, int target, int folder, int max){
       }
       dummy = myFile.read();
       j = 0;
-      while (dummy != '\n'){
+
+      if (myFile.available() == false){
+        Serial.println("End of the Line, time to call it");
+        break;
+      }
+
+      if (dummy == '\0'){
+        Serial.println("End of the Line, time to call it");
+        break;
+      }
+
+      while ((dummy != '\n') && (dummy != '\0')){
         tempRead[j] = (char)dummy;
         dummy = myFile.read();
 
         //Serial.println("In Dummy Clear Loop");
         j++;
       }
+
+      Serial.print("tempRead: ");
+      Serial.println(tempRead);
       // Serial.println(tempRead);
 
       for (int q = 0; q < FOL_SIZE; q++){
         folNumStr[q] = tempRead[q];
-        // Serial.print("Fol Num Str[q]: ");
-        // Serial.println(folNumStr[q]);
-        //Serial.println("In Find Fol Num Loop");
       }
-      // Serial.print("folder String: ");
-      // Serial.println(folNumStr);
-
-      // for (int m = 0; m < NUM_SIZE; m++){
-      //   lineNumStr[m] = tempRead[m];
-      // }
       for (int m = (NUMS_START); m < (NUMS_START + NUM_SIZE); m++){
-        // Serial.print("M: ");
-        // Serial.print(m);
-        // Serial.print(" NUMS_START: ");
-        // Serial.print(NUMS_START);
-        // Serial.print(" Start+Size: ");
-        // Serial.println((NUMS_START + NUM_SIZE));
-        // Serial.println(tempRead[m]);
         lineNumStr[m-NUMS_START] = tempRead[m];
-        // Serial.print("Line Num Str[m]: ");
-        // Serial.println(lineNumStr[m-NUMS_START]);
-        //Serial.println("In Find main Num Loop");
       }
-      // Serial.print("num string: ");
-      // Serial.println(lineNumStr);
 
       lineNum = atoi(lineNumStr);
       folNum = atoi(folNumStr);
-      //Serial.println(lineNum);
-
-      // Serial.print("Number: ");
-      // Serial.print(lineNum);
-      // Serial.print(" Target Num: ");
-      // Serial.print(target);
-      // Serial.print(" Folder: ");
-      // Serial.print(folNum);
-      // Serial.print(" Target Folder: ");
-      // Serial.println(folder);
 
       if ((lineNum == target) && (folNum == folder)){
         // Serial.println("Entering Buffer Loop");
